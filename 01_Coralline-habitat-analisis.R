@@ -1,9 +1,18 @@
+## Script related to the paper ##
+## "Coralline algae habitats: ##
+## an environmental and microstructural ##
+## assessment to understand microbial niches" ##
+## Creator Fabio Favoretto: favoretto.fabio@gmail.com ##
+
+
+# Loading libraries -------------------------------------------------------
+
+
 library(RCurl)
 library(tidyverse)
 library(circlize)
 library(RColorBrewer)
 library(ComplexHeatmap)
-library(plotly)
 library(vegan)
 library(ggthemes)
 library(mvpart)
@@ -12,15 +21,19 @@ library(MVPARTwrap)
 
 
 
+# Loading data ------------------------------------------------------------
+
 
 level_5 <- read.csv(url("https://raw.githubusercontent.com/Fabbiologia/Coralline-algae-habitats/master/data/level_5.csv"))
-
+halophilas <- read.csv(url("https://raw.githubusercontent.com/Fabbiologia/Coralline-algae-habitats/master/data/halophilas.csv"))
 env <- read.csv(url("https://raw.githubusercontent.com/Fabbiologia/Coralline-algae-habitats/master/data/env.csv"))
 
 
 
 
-# Heatmap taxa level 5
+
+# Heatmap Taxa level 5 ----------------------------------------------------
+
 
 # Matrix creation 
 
@@ -33,10 +46,7 @@ tmtx <- tmtx[,1:12]
 
 # heatmap plotting
 
-col_fun = colorRamp2(c(-3, 0, 3), c("dodgerblue4", "white", "firebrick"))
-
-
-
+col_fun <- colorRamp2(c(-3, 0, 3), c("dodgerblue4", "white", "firebrick")) #select colour ramp
 
 Heatmap(t(scale(t(tmtx))), 
         name = "Scale", 
@@ -44,19 +54,21 @@ Heatmap(t(scale(t(tmtx))),
         col = col_fun,
         clustering_distance_rows = "pearson",
         column_split = factor(c(rep("Winter",6),rep("Summer", 6)), levels = c("Winter", "Summer")),
-        column_title_gp = gpar(fill = c("#D0EAE1", "#EBB6AC"), alpha(.10)),
+        column_title_gp = gpar(fill = c("#D0EAE1", "#EBB6AC")),
         row_dend_reorder = TRUE,
         row_names_gp = gpar(fontsize = 5), 
         row_km = 2) 
 
 
 
-## NMDS model
-alg <- level_5[1:12,] 
 
+# NDMS model --------------------------------------------------------------
+
+alg <- level_5[1:12,] # selecting only algae samples
+
+# wrangling data:
 spe <- alg %>% 
         select(-c(index))
-
 
 rownames(spe) <- alg$index
 
@@ -67,12 +79,14 @@ grouping_info <- data.frame(
 
 
 #Get MDS stats
-sol<-metaMDS(spe,distance = "bray", trymax = 50)
+
+sol <- metaMDS(spe,distance = "bray", trymax = 50)
+
 plot.new()
-ord<-ordiellipse(sol, as.factor(grouping_info[,2]) ,display = "sites", kind ="sd", conf = 0.95, label = T)
+ord <- ordiellipse(sol, as.factor(grouping_info[,2]) ,display = "sites", kind ="sd", conf = 0.95, label = T)
 dev.off()
 
-NMDS=data.frame(x=sol$point[,1],y=sol$point[,2],Season=as.factor(grouping_info[,2]),Site=as.factor(grouping_info[,3]))
+NMDS <- data.frame(x=sol$point[,1],y=sol$point[,2],Season=as.factor(grouping_info[,2]),Site=as.factor(grouping_info[,3]))
 
 veganCovEllipse<-function (cov, center = c(0, 0), scale = 1, npoints = 100) 
 {
@@ -81,7 +95,7 @@ veganCovEllipse<-function (cov, center = c(0, 0), scale = 1, npoints = 100)
         t(center + scale * t(Circle %*% chol(cov)))
 }
 
-#Generate ellipse points
+# Generate ellipse points
 df_ell <- data.frame()
 for(g in levels(NMDS$Season)){
         if(g!="" && (g %in% names(ord))){
@@ -91,14 +105,16 @@ for(g in levels(NMDS$Season)){
                                               ,Season=g))
         }
 }
-#Generate mean values from NMDS plot grouped on Countries
-NMDS.mean=aggregate(NMDS[,1:2],list(group=NMDS$Season),mean)
+# Generate mean values from NMDS plot grouped on Seasons
+NMDS.mean <- aggregate(NMDS[,1:2],list(group=NMDS$Season),mean)
 
-shape_values<-seq(1,11)
+shape_values<-seq(1,11) #graphical parameters
 
+
+# Standardizing environmental variables
 env.z <- as.data.frame(decostand(env, method="standardize"))
 
-
+# Fitting environmental variables
 env.fit <- envfit(sol, env.z, permutations = 9999)
 
 (env.fit$vectors)
@@ -140,9 +156,12 @@ ggplot(data=NMDS,aes(x,y,colour=Season))+
               legend.position = "")
 
 
-## Multivariate Regression Tree
 
-spe.hel <- decostand(spe, method="hellinger") # you can also use method="hell" 
+# Multivariate Regression Tree --------------------------------------------
+
+# species transformation 
+spe.hel <- decostand(spe, method="hellinger") 
+
 # Create the regression tree
 env_sel <- env %>% 
         select(temperature, N_NO3, N_NO2, TN, Si_SiO2, DIN, Chl_a)
@@ -151,6 +170,9 @@ var <- env[1:13]
 spe.hel <- decostand(spe, method="hellinger") # you can also use method="hell" 
 
 spe.hel[is.na(spe.hel)] <- 0
+
+
+# Interactive group selection WARNING!! need to clic esc to exit the interactive visualization
 
 doubs.mrt <- mvpart(as.matrix(spe.hel) ~. ,env_sel,
                     legend=FALSE, margin=0.01, cp=0, xv="pick",
@@ -173,4 +195,57 @@ doubs.mrt.indval$pval
 (doubs.mrt.indval$maxcls[which(doubs.mrt.indval$pval<=0.05)])
 doubs.mrt.indval$indcls[which(doubs.mrt.indval$pval<=0.05)]
 
+
+
+
+
+
+# Heatmap halophilas ------------------------------------------------------
+
+## data wrangling of halophilas dataset
+mtx <- as.matrix(halophilas[2:ncol(halophilas)]) # this transform the data frame to a matrix (needed for the heatmap)
+rownames(mtx) <- halophilas$index # this apply rownames to the matrix (same as sample names)
+mtx <- mtx[1:12,]
+
+selMtx<- vegan::decostand(mtx, method = 'pa') %>% 
+        as.data.frame(.) %>% 
+        colSums(.) %>% 
+        as.data.frame(.) %>% 
+        dplyr::filter(.>=2)
+
+mtx2 <- as.matrix(halophilas[2:ncol(halophilas)]) # this transform the data frame to a matrix (needed for the heatmap)
+
+
+rownames(mtx2) <- halophilas$index # this apply rownames to the matrix (same as sample names)
+
+tmtx <- t(mtx)
+tmtx <- as.data.frame((tmtx))
+fullnames <- rownames(as.data.frame(tmtx))
+
+tmtx$id <- fullnames
+tmtx <- tmtx %>% 
+        dplyr::filter(id %in% rownames(selMtx)) %>% 
+        select(-id)
+
+tmtx2 <- tmtx[,1:12]
+ind <- apply(tmtx2, 1, function(x) all(x==0))
+tmtx2 <- tmtx2[ !ind, ]
+
+## end of data wrangling
+
+# heatmap plotting 
+col_fun <- colorRamp2(c(-3, 0, 3), c("dodgerblue4", "white", "firebrick")) # color ramp
+
+Heatmap(t(scale(t(tmtx2))), 
+        name = "Scale", 
+        cluster_columns = FALSE,
+        col = col_fun,
+        clustering_distance_rows = "pearson",
+        row_dend_reorder = TRUE,
+        row_names_gp = gpar(fontsize = 8)) 
+
+
+
+
+## END OF SCRIPT ==========
 
