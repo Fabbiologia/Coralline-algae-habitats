@@ -120,7 +120,7 @@ env.fit <- envfit(sol, env.z, permutations = 9999)
 (env.fit$vectors)
 
 env_sel <- env.z %>% 
-        select(temperature, N_NH4, N_NO3, N_NO2, Si_SiO2, DIN, TN, TNtoTP, Chl_a)
+        select(temperature, N_NH4, N_NO3, N_NO2, Si_SiO2, DIN, TN, TNtoTP)
 #Get site information
 df<-scores(sol,display=c("sites"))
 
@@ -155,7 +155,29 @@ ggplot(data=NMDS,aes(x,y,colour=Season))+
               panel.border = element_rect(fill = NA), 
               legend.position = "")
 
+tiff(filename = "NMDS.tif", width = 8, height = 5, units = "in", res = 300)
 
+ggplot(data=NMDS,aes(x,y,colour=Season))+ 
+        annotate("text",x=NMDS.mean$x,y=NMDS.mean$y+0.4,label=NMDS.mean$group,size=4, fontface = 2)+ 
+        geom_path(data=df_ell, aes(x=NMDS1, y=NMDS2), size=.1, linetype=1)+
+        geom_point(aes(shape=Site))+
+        labs(caption = "Stress = 0.02")+
+        scale_color_brewer(palette = "Set2", direction = -1)+
+        geom_segment(data=vec.sp.df,
+                     aes(x=0,xend=MDS1,y=0,yend=MDS2), 
+                     arrow = arrow(length = unit(0.1, "cm")),
+                     colour="grey90") + 
+        ggrepel::geom_text_repel(data = vec.sp.df, 
+                                 aes(x=MDS1, y=MDS2, label=species), 
+                                 size=4, inherit.aes = FALSE)+
+        theme_classic()+
+        theme(axis.line = element_blank(), 
+              axis.ticks = element_blank(),
+              axis.text = element_blank(), 
+              axis.title = element_blank(), 
+              panel.border = element_rect(fill = NA), 
+              legend.position = "")
+dev.off()
 
 # Multivariate Regression Tree --------------------------------------------
 
